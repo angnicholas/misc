@@ -146,8 +146,12 @@ class MultiNode:
                 child_trees: List[Node] = child.multidfs()
                 list_of_trees.append(child_trees)
 
-            all_possibilities: List[List[Node]] = [p for p in itertools.product(*list_of_trees)]
-            all_trees_per_cp: List[Node] = [Node(possible_combination, self.uid, self.payload) for possible_combination in all_possibilities]
+            all_possibilities: List[List[Node]] = \
+                [p for p in itertools.product(*list_of_trees)]
+            
+            all_trees_per_cp: List[Node] = \
+                [Node(possible_combination, self.uid, self.payload) 
+                 for possible_combination in all_possibilities]
             result.extend(all_trees_per_cp)
         return result
     
@@ -198,8 +202,9 @@ class EarleyParser:
         self.grammar: List[Rule] = grammar
         self.privileged_pos: List[str] = privileged_pos
     
-    def generate_state_table(self, start_rule: Rule, sentence: List[str]):
-
+    def generate_state_table(self, start_rule: Rule, sentence: List[str], step_through: False):
+        # print(sentence, len(sentence))
+        # print("sentence length", len(sentence) + 1)
         state_table: List[List[Item]] = [[] for i in range(len(sentence) + 1)]
         state_table[0].append(Item.from_rule(start_rule, 0, 0, 0))
 
@@ -210,6 +215,13 @@ class EarleyParser:
             print(f"Looping through items in layer {i}")
             j = 0
             while j < len(state_table[i]):
+
+                if step_through:
+                    _ = input()
+                    print('')
+                    print('================= NEW STEP =================')
+                    pretty_print_s(state_table)                    
+
                 item =  state_table[i][j]
                 next_type = get_symbol_type(item.next)
 
@@ -276,53 +288,32 @@ class EarleyParser:
                 j += 1
 
         return state_table
-    
-    # def parse(self, start_rule, sentence):
-    #     states = self.generate_state_table(start_rule, sentence)
 
-    #     print("Final states")
-    #     pretty_print_s(states)
-
-    #     final_states = [i for i in states[len(sentence)-1] if i.start == 0]
-    #     if len(final_states) == 0:
-    #         raise Exception("There is no final state!")
-
-    #     final_state = final_states[0]
-    #     def dfs(node):
-    #         print(node)
-    #         for history in node.histories:
-    #             for i, j in history:
-    #                 dfs(states[i][j])
-
-    #     print("Final parse tree:")
-    #     dfs(final_state)
-
-    def parse(self, start_rule, sentence):
+    def parse(self, start_rule, sentence, step_through=False):
 
         print('')
         print('Generating state table for sentence' + ' '.join(sentence) + '...')
 
-        states = self.generate_state_table(start_rule, sentence)
+        states = self.generate_state_table(start_rule, sentence, step_through)
 
         pretty_print_s(states)
 
-        # Convert the states into nodes
+        # Convert the state table into a table of nodes
         states_as_nodes: List[List[MultiNode]] = [[]]
         for lvl_idx, level in enumerate(states):
             for item in level:
-
-                new_histories: List[List[MultiNode]] = []
-                for history in item.histories:
+                states_as_nodes[lvl_idx].append(
+                    MultiNode([], (item.concise_repr), item))
+            states_as_nodes.append([])
+        
+        for level in states_as_nodes:
+            for node_item in level:
+                for history in node_item.payload.histories:
                     new_history = []
                     for i, j in history:
                         new_history.append(states_as_nodes[i][j])
-                    new_histories.append(new_history)
+                    node_item.children.append(new_history)
 
-                states_as_nodes[lvl_idx].append(
-                    MultiNode(new_histories, (item.concise_repr), item))
-            
-            lvl_idx += 1
-            states_as_nodes.append([])
 
         # Get final states
         final_states = [i for i in states_as_nodes[len(sentence)-1] if i.payload.start == 0]
@@ -373,6 +364,7 @@ grammar  = Grammar(
         Rule(N, ['fish']),
         Rule(N, ['can']),
         Rule(N, ['rivers']),
+        Rule(N, ['december']),
 
         Rule(P, ['in']),
 
@@ -387,9 +379,13 @@ for rule in grammar.rules:
 
 start_rule = Rule(S, [NP, VP])
 privileged_pos = [N, P, V] # Parts of Speech
-sentence = ['they', 'can', 'fish', 'in', 'rivers', 'EOF']
+# sentence = ['they', 'can', 'fish', 'in', 'rivers', 'EOF']
+sentence = ['they', 'can', 'fish', 'in', 'rivers', 'in', 'december', 'EOF']
 parser = EarleyParser(grammar, privileged_pos)
-parser.parse(start_rule, sentence)
+# try:
+parser.parse(start_rule, sentence, False)
+# except:
+#     pass
 # print(final_state)
 # def dfs(node):
 #     print(node)
@@ -400,3 +396,9 @@ parser.parse(start_rule, sentence)
 # print("Final parse tree:")
 # dfs(final_state)
 # parser.parse(start_rule, sentence)
+
+# mylist = [1, 2]
+# j = 0
+# while j < len(mylist):
+#     print(mylist[j])
+#     mylist.append(j)
